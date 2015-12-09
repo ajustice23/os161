@@ -48,8 +48,9 @@ int catmouse(int, char **);
  */
 
 /*Allissa added code*/
-void hello(void);
-
+//void hello(void);
+int  printhellotest(int, char **);
+int threadtestmine(int, char **);
 /* lib tests */
 int arraytest(int, char **);
 int bitmaptest(int, char **);

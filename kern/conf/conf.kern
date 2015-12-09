@@ -385,7 +385,7 @@ file      syscall/file_syscalls.c
 
 file      startup/main.c
 file      startup/menu.c
-file	  startup/hello.c
+
 
 ########################################
 #                                      #
@@ -432,6 +432,8 @@ optfile   synchprobs  synchprobs/catmouse_synch.c
 #                                      #
 ########################################
 
+file 		test/threadfun.c
+file 		test/printhellotest.c
 file		test/arraytest.c
 file		test/bitmaptest.c
 file		test/threadtest.c
