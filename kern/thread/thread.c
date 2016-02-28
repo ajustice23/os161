@@ -52,7 +52,7 @@
 #include <vnode.h>
 
 #include "opt-synchprobs.h"
-
+#include <kern/proc_syscalls.h>
 
 /* Magic number used as a guard value on kernel thread stacks. */
 #define THREAD_STACK_MAGIC 0xbaadf00d
@@ -150,7 +150,12 @@ thread_create(const char *name)
 	thread->t_iplhigh_count = 1; /* corresponding to t_curspl */
 
 	/* If you add to struct thread, be sure to initialize here */
-
+	pid_t id = givepid();
+	if(id > PID_MAX){
+		return NULL;
+	}
+	thread->pid=id;
+	init_process(thread,id);
 	return thread;
 }
 
@@ -257,7 +262,9 @@ thread_destroy(struct thread *thread)
 
 	/* sheer paranoia */
 	thread->t_wchan_name = "DESTROYED";
-
+	
+	//kfree((thread->pid));
+	//kfree((thread->ppid));
 	kfree(thread->t_name);
 	kfree(thread);
 }

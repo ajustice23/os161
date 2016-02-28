@@ -106,6 +106,9 @@ struct thread {
 	 */
 
 	/* add more here as needed */
+
+	pid_t pid; /*thread's current process id*/
+	pid_t ppid; /*thread's parent process id*/
 };
 
 /*
