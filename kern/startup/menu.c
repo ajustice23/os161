@@ -128,34 +128,49 @@ static
 int
 common_prog(int nargs, char **args)
 {
-	struct proc *proc;
+	//struct proc *proc;
+	userptr_t status; 
+	pid_t retval;
 	int result;
-
+	struct thread *newthread;
 #if OPT_SYNCHPROBS
 	kprintf("Warning: this probably won't work with a "
 		"synchronization-problems kernel.\n");
 #endif
 
-	/* Create a process for the new program to run in. */
-	proc = proc_create_runprogram(args[0] /* name */);
-	if (proc == NULL) {
-		return ENOMEM;
-	}
 
-	result = thread_fork(args[0] /* thread name */,
-			proc /* new process */,
-			cmd_progthread /* thread function */,
-			args /* thread arg */, nargs /* thread arg */);
+
+	/* Create a process for the new program to run in. */
+//	proc = proc_create_runprogram(args[0] /* name */);
+//	if (proc == NULL) {
+//		return ENOMEM;
+//	}
+
+	//result = thread_fork(args[0] /* thread name */,
+	//		proc /* new process */,
+	//		cmd_progthread /* thread function */,
+	//		args /* thread arg */, nargs /* thread arg */);
+	
+	result = thread_fork1(args[0],cmd_progthread,args,nargs,&newthread);
+	
 	if (result) {
 		kprintf("thread_fork failed: %s\n", strerror(result));
-		proc_destroy(proc);
+		//proc_destroy(proc);
 		return result;
 	}
+
+	result = sys_waitpid(newthread ->pid,status,0,&retval);
+
+	if(result){
+		kprintf("sys_waitpid failed in common_prog");
+		return 0;
+	}
+
 
 #ifdef UW
 	/* wait until the process we have just launched - and any others that it 
 	   may fork - is finished before proceeding */
-	P(no_proc_sem);
+	//P(no_proc_sem);
 #endif // UW
 
 	return 0;

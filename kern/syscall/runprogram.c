@@ -54,7 +54,7 @@
 int
 runprogram(char *progname)
 {
-	struct addrspace *as;
+	//struct addrspace *as;
 	struct vnode *v;
 	vaddr_t entrypoint, stackptr;
 	int result;
@@ -66,18 +66,18 @@ runprogram(char *progname)
 	}
 
 	/* We should be a new process. */
-	KASSERT(curproc_getas() == NULL);
+	KASSERT(curthread->t_addrspace == NULL);
 
 	/* Create a new address space. */
-	as = as_create();
-	if (as ==NULL) {
+	curthread->t_addrspace = as_create();
+	if (curthread->t_addrspace ==NULL) {
 		vfs_close(v);
 		return ENOMEM;
 	}
 
 	/* Switch to it and activate it. */
-	curproc_setas(as);
-	as_activate();
+
+	as_activate(curthread->t_addrspace);
 
 	/* Load the executable. */
 	result = load_elf(v, &entrypoint);
@@ -91,7 +91,7 @@ runprogram(char *progname)
 	vfs_close(v);
 
 	/* Define the user stack in the address space */
-	result = as_define_stack(as, &stackptr);
+	result = as_define_stack(curthread->t_addrspace, &stackptr);
 	if (result) {
 		/* p_addrspace will go away when curproc is destroyed */
 		return result;

@@ -78,8 +78,15 @@ kill_curthread(vaddr_t epc, unsigned code, vaddr_t vaddr)
 	KASSERT(code < NTRAPCODES);
 	switch (code) {
 	    case EX_IRQ:
+			 sig=SIGINT;
+			 break;
 	    case EX_IBE:
+			 sig=SIGBUS;
+ 			 break;
+
 	    case EX_DBE:
+			 sig=SIGBUS;
+			 break;
 	    case EX_SYS:
 		/* should not be seen */
 		KASSERT(0);

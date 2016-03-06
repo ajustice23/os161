@@ -65,37 +65,24 @@ void changeppid(pid_t change, pid_t ppid) {
 
 void sys__exit(int exitcode) {
 
-  struct addrspace *as;
-  struct proc *p = curproc;
-  /* for now, just include this to keep the compiler from complaining about
-     an unused variable */
-  (void)exitcode;
+	struct process_table_entry *temp1; // for ppid
+	for(temp1=process_table; temp1->pid!=curthread->ppid || temp1 == NULL; temp1=temp1->next);
+	
+	if(temp1==NULL){
+		//do nothing if process doesn't exit 
+	}else if(temp1->proc->exited == false){
+		struct process_table_entry *temp2; //for pid
+		for(temp2=process_table; temp2->pid!=curthread->pid || temp2==NULL; temp2=temp2->next);
+		
+		temp2->proc->exitcode=_MKWAIT_EXIT(exitcode);
+		temp2->proc->exited=true;
+		V(temp2->proc->exitsem);
+	}else{
+		destroy_process(curthread->pid);
+	}
 
-  DEBUG(DB_SYSCALL,"Syscall: _exit(%d)\n",exitcode);
+	thread_exit();
 
-  KASSERT(curproc->p_addrspace != NULL);
-  as_deactivate();
-  /*
-   * clear p_addrspace before calling as_destroy. Otherwise if
-   * as_destroy sleeps (which is quite possible) when we
-   * come back we'll be calling as_activate on a
-   * half-destroyed address space. This tends to be
-   * messily fatal.
-   */
-  as = curproc_setas(NULL);
-  as_destroy(as);
-
-  /* detach this thread from its process */
-  /* note: curproc cannot be used after this call */
-  proc_remthread(curthread);
-
-  /* if this is the last user process in the system, proc_destroy()
-     will wake up the kernel menu thread */
-  proc_destroy(p);
-  
-  thread_exit();
-  /* thread_exit() does not return, so we should never get here */
-  panic("return from thread_exit in sys_exit\n");
 }
 
 
@@ -107,32 +94,116 @@ int sys_getpid(pid_t *retval)
   return(0);
 }
 
-/* stub handler for waitpid() system call                */
 
 int sys_waitpid(pid_t pid, userptr_t status, int options, pid_t *retval)
 {
-  int exitstatus;
-  int result;
+	int result;
+	struct process *child;
+	
+	/*options should always be 0*/
 
-  /* this is just a stub implementation that always reports an
-     exit status of 0, regardless of the actual exit status of
-     the specified process.   
-     In fact, this will return 0 even if the specified process
-     is still running, and even if it never existed in the first place.
+	if(options != 0){  
+		return EINVAL;
+	}
 
-     Fix this!
-  */
+	/*If there is no status pointer */
+	if(status == NULL){
+		return EFAULT;
+	}
 
-  if (options != 0) {
-    return(EINVAL);
-  }
-  /* for now, just pretend the exitstatus is 0 */
-  exitstatus = 0;
-  result = copyout((void *)&exitstatus,status,sizeof(int));
+	/*Make sure pid is not -1 or 0 which are reserved for special cases */
+	if(pid <PID_MIN){
+		return EINVAL;
+	}
+
+	/*Make sure pid is not above the valid number of pids*/
+	if(pid> PID_MAX){
+		return ESRCH;
+	}
+
+	/*Check that pid provided isn't the current thread's pid*/
+	if(curthread->pid==pid){
+		return ECHILD;
+	}
+	
+	/*Check that pid provided isn't the current thread's ppid*/
+	if(curthread->ppid == pid){
+		return ECHILD;
+	}
+
+	struct process_table_entry *temp1;
+	for(temp1=process_table; (temp1->pid!=pid || temp1==NULL); temp1=temp1->next);
+
+	/*Process doesn't exist*/
+	if(temp1==NULL){
+		return ESRCH;
+	}
+
+	/*If the proxes has not exited then use the exit semaphore for that process*/
+	if(temp1->proc->exited == false){
+		P(temp1->proc->exitsem);
+	}
+
+	child =temp1->proc;
+
+
+
+  result = copyout((const void *)&(child->exitcode),status,sizeof(int));
   if (result) {
-    return(result);
+    return EFAULT;
   }
   *retval = pid;
+
+	destroy_process(pid);
   return(0);
 }
 
+void entrypoint(void *data1, unsigned long data2){
+	struct trapframe *tf = data1;
+	struct trapframe tfnew;
+	
+	
+
+	(void) data2;
+
+
+	tfnew = *tf;
+	kfree(tf);
+enter_forked_process(&tfnew);
+}
+
+int sys_fork(struct trapframe *tf, pid_t *retval){
+	int result;
+	struct thread *child_thread;
+
+	struct addrspace *child_addrspace;
+	result = as_copy(curthread->t_addrspace, &child_addrspace); //copy parent address space to child
+
+	if(result){
+		return ENOMEM; //not enough memory to copy
+	}
+
+	struct trapframe *child_tf = kmalloc(sizeof(struct trapframe));
+	
+	if(child_tf==NULL){
+		return ENOMEM; //not enough memory to kmalloc
+	}
+
+	//*child_tf = *tf; //copy parent's trapframe to child
+	memcpy(child_tf,tf,sizeof(struct trapframe));
+//	result = thread_fork1("Child Thread",
+//			entrypoint
+//			,(void *)child_tf
+//			,child_addrspace
+//			,&child_thread);
+	
+	result = thread_fork1("Child Thread",entrypoint,(struct trapframe *) child_tf,0 ,&child_thread);
+
+	if(result){
+		return ENOMEM; //not enough memory to fork
+	}
+	
+	//parent gets child's pid
+	*retval = child_thread->pid;
+	return (0);
+}

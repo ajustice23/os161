@@ -160,7 +160,7 @@ load_elf(struct vnode *v, vaddr_t *entrypoint)
 	struct uio ku;
 	struct addrspace *as;
 
-	as = curproc_getas();
+	as = curthread->t_addrspace;
 
 	/*
 	 * Read the executable header from offset 0 in the file.
@@ -305,3 +305,6 @@ load_elf(struct vnode *v, vaddr_t *entrypoint)
 
 	return 0;
 }
+
+
+

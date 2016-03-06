@@ -140,7 +140,7 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 		return EFAULT;
 	}
 
-	as = curproc_getas();
+	as = curthread->t_addrspace;
 	if (as == NULL) {
 		/*
 		 * No address space set up. This is probably also a
@@ -233,12 +233,11 @@ as_destroy(struct addrspace *as)
 }
 
 void
-as_activate(void)
+as_activate(struct addrspace *as)
 {
 	int i, spl;
-	struct addrspace *as;
 
-	as = curproc_getas();
+	(void)as;
 #ifdef UW
         /* Kernel threads don't have an address spaces to activate */
 #endif

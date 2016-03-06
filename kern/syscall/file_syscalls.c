@@ -33,9 +33,9 @@ sys_write(int fdesc,userptr_t ubuf,unsigned int nbytes,int *retval)
   if (!((fdesc==STDOUT_FILENO)||(fdesc==STDERR_FILENO))) {
     return EUNIMP;
   }
-  KASSERT(curproc != NULL);
-  KASSERT(curproc->console != NULL);
-  KASSERT(curproc->p_addrspace != NULL);
+//  KASSERT(curthread->t_proc != NULL);
+  //KASSERT(curproc->console != NULL);
+ // KASSERT(curthread->t_addrspace != NULL);
 
   /* set up a uio structure to refer to the user program's buffer (ubuf) */
   iov.iov_ubase = ubuf;
@@ -46,9 +46,9 @@ sys_write(int fdesc,userptr_t ubuf,unsigned int nbytes,int *retval)
   u.uio_resid = nbytes;
   u.uio_segflg = UIO_USERSPACE;
   u.uio_rw = UIO_WRITE;
-  u.uio_space = curproc->p_addrspace;
+  u.uio_space = curthread->t_addrspace;
 
-  res = VOP_WRITE(curproc->console,&u);
+  res = VOP_WRITE(curthread->t_proc->console,&u);
   if (res) {
     return res;
   }

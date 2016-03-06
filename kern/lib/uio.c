@@ -52,7 +52,7 @@ uiomove(void *ptr, size_t n, struct uio *uio)
 		KASSERT(uio->uio_space == NULL);
 	}
 	else {
-		KASSERT(uio->uio_space == curproc_getas());
+		KASSERT(uio->uio_space == curthread->t_addrspace);
 	}
 
 	while (n > 0 && uio->uio_resid > 0) {

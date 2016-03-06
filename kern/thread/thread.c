@@ -155,6 +155,7 @@ thread_create(const char *name)
 		return NULL;
 	}
 	thread->pid=id;
+	//thread->t_addrspace = NULL;	
 	init_process(thread,id);
 	return thread;
 }
@@ -541,6 +542,65 @@ thread_fork(const char *name,
 	return 0;
 }
 
+int
+thread_fork1(const char *name,
+	    void (*entrypoint)(void *data1, unsigned long data2),
+	    void *data1, unsigned long data2,
+	    struct thread **ret)
+{
+	struct thread *newthread;
+	//int result;
+
+#ifdef UW
+	DEBUG(DB_THREADS,"Forking thread: %s\n",name);
+#endif // UW
+
+	newthread = thread_create(name);
+	if (newthread == NULL) {
+		return ENOMEM;
+	}
+
+	/* Allocate a stack */
+	newthread->t_stack = kmalloc(STACK_SIZE);
+	if (newthread->t_stack == NULL) {
+		thread_destroy(newthread);
+		return ENOMEM;
+	}
+	thread_checkstack_init(newthread);
+
+	/*
+	 * Now we clone various fields from the parent thread.
+1		 */
+
+	/* Thread subsystem fields */
+	newthread->t_cpu = curthread->t_cpu;
+
+
+
+	newthread->ppid =curthread->pid; //new thread's parent pid is the current thread's pid
+	changeppid(newthread->pid, curthread->pid);
+
+	
+	/*
+	 * Because new threads come out holding the cpu runqueue lock
+	 * (see notes at bottom of thread_switch), we need to account
+	 * for the spllower() that will be done releasing it.
+	 */
+	newthread->t_iplhigh_count++;
+
+	/* Set up the switchframe so entrypoint() gets called */
+	switchframe_init(newthread, entrypoint, data1, data2);
+
+	/* Lock the current cpu's run queue and make the new thread runnable */
+	thread_make_runnable(newthread, false);
+
+	if(ret!=NULL){
+		*ret=newthread;
+	}
+
+	return 0;
+}
+
 /*
  * High level, machine-independent context switch code.
  *
@@ -716,7 +776,7 @@ thread_switch(threadstate_t newstate, struct wchan *wc)
 	spinlock_release(&curcpu->c_runqueue_lock);
 
 	/* Activate our address space in the MMU. */
-	as_activate();
+	as_activate(curthread->t_addrspace);
 
 	/* Clean up dead threads. */
 	exorcise();
@@ -749,7 +809,7 @@ thread_startup(void (*entrypoint)(void *data1, unsigned long data2),
 	spinlock_release(&curcpu->c_runqueue_lock);
 
 	/* Activate our address space in the MMU. */
-	as_activate();
+	as_activate(curthread->t_addrspace);
 
 	/* Clean up dead threads. */
 	exorcise();

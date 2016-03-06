@@ -25,13 +25,13 @@ int proc_count;
 pid_t givepid(void);
 void init_process(struct thread *th, pid_t id);
 void destroy_process(pid_t pid);
-//void entrypoint(void* data1, unsigned long data2);
+void entrypoint(void* data1, unsigned long data2);
 void changeppid(pid_t change, pid_t ppid);
 
 void sys__exit(int exitcode);
 int sys_getpid(pid_t *retval);
 int sys_waitpid(pid_t pid, userptr_t status,int options, pid_t *retval);
-//pid_t sys_fork(struct trapframe *trap, pid_t *retval);
+int sys_fork(struct trapframe *trap, pid_t *retval);
 //int sys_execv(const char *program, char **args);
 
 

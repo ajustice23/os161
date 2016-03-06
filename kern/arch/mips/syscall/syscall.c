@@ -79,7 +79,7 @@ void
 syscall(struct trapframe *tf)
 {
 	int callno;
-	int32_t retval;
+	pid_t retval;
 	int err;
 
 	KASSERT(curthread != NULL);
@@ -132,7 +132,10 @@ syscall(struct trapframe *tf)
 #endif // UW
 
 	    /* Add stuff here */
- 
+	case SYS_fork:
+	 err= sys_fork(tf,&retval);
+	 break;
+
 	default:
 	  kprintf("Unknown syscall %d\n", callno);
 	  err = ENOSYS;
@@ -179,5 +182,10 @@ syscall(struct trapframe *tf)
 void
 enter_forked_process(struct trapframe *tf)
 {
-	(void)tf;
+	tf->tf_v0=0;
+	tf->tf_a3=0;
+
+	tf->tf_epc += 4;
+
+	mips_usermode(tf);
 }

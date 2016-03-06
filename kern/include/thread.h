@@ -107,6 +107,7 @@ struct thread {
 
 	/* add more here as needed */
 
+	struct addrspace *t_addrspace;
 	pid_t pid; /*thread's current process id*/
 	pid_t ppid; /*thread's parent process id*/
 };
@@ -143,9 +144,15 @@ void thread_shutdown(void);
  * general safe to refer to it as the new thread may exit and
  * disappear at any time without notice.
  */
-int thread_fork(const char *name, struct proc *proc,
+int
+thread_fork(const char *name,
+            struct proc *proc,
+            void (*entrypoint)(void *data1, unsigned long data2),
+            void *data1, unsigned long data2);
+
+int thread_fork1(const char *name,
                 void (*func)(void *, unsigned long),
-                void *data1, unsigned long data2);
+                void *data1, unsigned long data2,struct thread **ret);
 
 /*
  * Cause the current thread to exit.
