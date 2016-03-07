@@ -50,6 +50,7 @@
 #include <vfs.h>
 #include <synch.h>
 #include <kern/fcntl.h>  
+#include <array.h>
 
 /*
  * The process for the kernel; this holds all the kernel-only threads.
@@ -69,7 +70,8 @@ static struct semaphore *proc_count_mutex;
 struct semaphore *no_proc_sem;   
 #endif  // UW
 
-
+struct array *proc_array;
+pid_t intial_pid = 0;
 
 /*
  * Create a proc structure.
@@ -103,6 +105,40 @@ proc_create(const char *name)
 	proc->console = NULL;
 #endif // UW
 
+	proc->pid = gen_pid();
+	proc->p_exited = false;
+	proc->p_exitcode = 0;
+
+	proc->p_exit_lk = lock_create("p_exit_lk");
+
+	if(proc->p_exit_lk == NULL){
+		kfree(proc->p_name);
+		kfree(proc);
+		return NULL;
+	}
+
+	proc->p_wait_lk = lock_create("p_wait_lk");
+		if (proc->p_exit_lk == NULL) {
+			lock_destroy(proc->p_exit_lk);
+			kfree(proc->p_name);
+			kfree(proc);
+			return NULL;
+		}
+
+	proc->p_wait_cv = cv_create("p_wait_cv");
+
+	if (proc->p_exit_lk == NULL) {
+		lock_destroy(proc->p_wait_lk);
+		lock_destroy(proc->p_exit_lk);
+		kfree(proc->p_name);
+		kfree(proc);
+		return NULL;
+	}	
+
+	proc->p_children = *array_create();
+	array_init(&proc->p_children);
+
+	procarray_allprocs_add_proc(proc);
 	return proc;
 }
 
@@ -123,6 +159,11 @@ proc_destroy(struct proc *proc)
 
 	KASSERT(proc != NULL);
 	KASSERT(proc != kproc);
+
+
+	//remove proc from procarray
+	
+	procarray_allprocs_remove_proc(proc->pid);
 
 	/*
 	 * We don't take p_lock in here because we must have the only
@@ -165,6 +206,11 @@ proc_destroy(struct proc *proc)
 
 	threadarray_cleanup(&proc->p_threads);
 	spinlock_cleanup(&proc->p_lock);
+
+	array_cleanup(&proc->p_children);
+	lock_destroy(proc->p_exit_lk);
+	lock_destroy(proc->p_wait_lk);
+	cv_destroy(proc->p_wait_cv);
 
 	kfree(proc->p_name);
 	kfree(proc);
@@ -364,3 +410,57 @@ curproc_setas(struct addrspace *newas)
 	spinlock_release(&proc->p_lock);
 	return oldas;
 }
+
+unsigned procarray_proc_index_by_pid(struct array *procs, pid_t pid){
+	
+	for(unsigned i = 0;i<array_num(procs);i++){
+	
+		struct proc *p = array_get(procs,i);
+
+		if(p->pid == pid){
+			return i;
+		}
+	}
+	
+	return -1;
+}
+
+struct proc * procarray_proc_by_pid(struct array *procs, pid_t pid){
+	return array_get(procs, procarray_proc_index_by_pid(procs, pid));
+}
+
+struct proc *procarray_allprocs_proc_by_pid(pid_t pid){
+	return procarray_proc_by_pid(proc_array, pid);
+}
+
+void procarray_add_proc(struct array *procs, struct proc *p){
+	array_add(procs,p,NULL);
+}
+
+void procarray_allprocs_add_proc(struct proc *p){
+	if(proc_array ==NULL){
+		proc_array=array_create();
+		array_init(proc_array);
+	}
+	procarray_add_proc(proc_array,p);
+}
+void procarray_remove_proc(struct array *procs,pid_t pid){
+	array_remove(procs, procarray_proc_index_by_pid(procs,pid));
+}
+
+void procarray_allprocs_remove_proc(pid_t pid){
+	procarray_remove_proc(proc_array,pid);
+
+	//clean up proc_array if it's empty
+	if(array_num(proc_array)==0){
+		array_cleanup(proc_array);
+		array_destroy(proc_array);
+		proc_array = NULL;
+	}
+}
+
+pid_t gen_pid(){
+	return ++intial_pid;
+}
+	
+

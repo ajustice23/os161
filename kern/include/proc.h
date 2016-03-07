@@ -69,6 +69,16 @@ struct proc {
 #endif
 
 	/* add more material here as needed */
+	
+	pid_t pid;
+	struct array p_children;
+	bool p_exited;
+	int p_exitcode;
+
+	struct lock *p_exit_lk;
+	struct lock *p_wait_lk;
+	struct cv *p_wait_cv;
+
 };
 
 /* This is the process structure for the kernel and for kernel-only threads. */
@@ -100,5 +110,18 @@ struct addrspace *curproc_getas(void);
 /* Change the address space of the current process, and return the old one. */
 struct addrspace *curproc_setas(struct addrspace *);
 
+//Stuff I added dealing with the process array.
+unsigned procarray_proc_index_by_pid(struct array *procs, pid_t pid); // returns index for process (or -1 if fail)
+struct proc * procarray_proc_by_pid(struct array *procs, pid_t pid); // returns actual process
+struct proc * procarray_allprocs_proc_by_pid(pid_t pid);
+
+
+void procarray_add_proc(struct array *procs, struct proc *p);
+void procarray_allprocs_add_proc(struct proc *p);
+
+void procarray_remove_proc(struct array *procs, pid_t pid);
+void procarray_allprocs_remove_proc(pid_t pid);
+
+pid_t gen_pid(void);
 
 #endif /* _PROC_H_ */

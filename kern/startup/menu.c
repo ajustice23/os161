@@ -130,7 +130,8 @@ common_prog(int nargs, char **args)
 {
 	struct proc *proc;
 	int result;
-
+	userptr_t status;
+	pid_t *retval;
 #if OPT_SYNCHPROBS
 	kprintf("Warning: this probably won't work with a "
 		"synchronization-problems kernel.\n");
@@ -152,6 +153,11 @@ common_prog(int nargs, char **args)
 		return result;
 	}
 
+	result = sys_waitpid(proc->pid,status,0,retval);
+	if(result){
+		kprintf("wait_pid failed");
+		return 0;
+	}
 #ifdef UW
 	/* wait until the process we have just launched - and any others that it 
 	   may fork - is finished before proceeding */
